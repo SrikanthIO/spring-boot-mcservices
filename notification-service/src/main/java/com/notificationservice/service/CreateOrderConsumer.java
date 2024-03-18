@@ -9,6 +9,8 @@ import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import com.orderservice.model.Order;
 
 import kong.unirest.HttpResponse;
@@ -39,13 +41,36 @@ public class CreateOrderConsumer {
   @Value("${spring.cloudio.api_secret}")
   private String cldApiSecret;
 
+  @Value("${spring.cloudio.object}")
+  private String cldObject;
+
   private void postToWorkflow(Order order) {
+    JsonObject bodyjson = new JsonObject();
+    JsonObject orderStatus = new JsonObject();
+    orderStatus.addProperty("ds", cldObject);
+    JsonArray dataArray = new JsonArray();
+    JsonObject dataObj = new JsonObject();
+    dataObj.addProperty("_rs", "I");
+    dataObj.addProperty("orderId", order.getId().toString());
+    if (order.getOrderLineItemsList() != null && order.getOrderLineItemsList().size() > 0) {
+      dataObj.addProperty("productCode", order.getOrderLineItemsList().get(0).getSkuCode());
+      dataObj.addProperty("productQty", order.getOrderLineItemsList().get(0).getQuantity());
+    }
+    dataObj.addProperty("internalId", order.getInternalId());
+
+    dataArray.add(dataObj);
+    orderStatus.add("data", dataArray);
+    bodyjson.add("OrderStatusAlias", orderStatus);
     HttpResponse<JsonNode> response = Unirest.post(cldWorkflowUrl)
-        .header("accept", "application/json")
-        .queryString("apiKey", "123")
-        .field("parameter", "value")
-        .field("firstname", "Gary")
+        .header("X-Application", cldAppName)
+        .header("X-Api-Key", cldApiKey)
+        .header("Content-Type", "application/json")
+        .header("Authorization", "Bearer " + cldApiSecret)
+        .body(bodyjson.toString())
         .asJson();
+
+    log.info("Response Status:{}", response.getStatus());
+    log.info("Response:{}", response.getBody().toPrettyString());
   }
 
 }
