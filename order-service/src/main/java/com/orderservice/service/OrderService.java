@@ -3,11 +3,14 @@ package com.orderservice.service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
+import org.apache.kafka.common.Uuid;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import com.google.gson.JsonObject;
 import com.orderservice.dto.InventoryResponse;
 import com.orderservice.dto.OrderLineItemsDto;
 import com.orderservice.dto.OrderRequest;
@@ -29,7 +32,9 @@ public class OrderService {
 
   private final WebClient.Builder webClientBuilder;
 
-  public String placeOrder(OrderRequest orderRequest) {
+  private final CreateOrderProducer createOrderProducer;
+
+  public String placeOrder(OrderRequest orderRequest) throws ExecutionException, InterruptedException {
 
     Order order = getOrderObject(orderRequest);
 
@@ -49,7 +54,13 @@ public class OrderService {
       throw new IllegalArgumentException("Out of stock, please try again later...");
     } else {
       orderRepository.save(order);
-      return "Order Placed successfully!!";
+      // create order event
+      createOrderProducer.sendCreateOrderEvent(order);
+      JsonObject obj = new JsonObject();
+      obj.addProperty("status", "Success");
+      obj.addProperty("internalId", order.getInternalId());
+
+      return obj.toString();
     }
   }
 
@@ -61,6 +72,7 @@ public class OrderService {
     return Order.builder()
         .orderNumber(UUID.randomUUID().toString())
         .orderLineItemsList(orderLineItems)
+        .internalId(Uuid.randomUuid().toString())
         .build();
   }
 

@@ -2,6 +2,7 @@
 package com.orderservice.controller;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,7 @@ public class OrderController {
   @PostMapping("/create")
   @ResponseStatus(HttpStatus.CREATED)
   @CircuitBreaker(name = "inventory", fallbackMethod = "fallbackMethod")
-  public String placeOrder(@RequestBody OrderRequest orderRequest) {
+  public String placeOrder(@RequestBody OrderRequest orderRequest) throws ExecutionException, InterruptedException {
     return orderService.placeOrder(orderRequest);
   }
 
